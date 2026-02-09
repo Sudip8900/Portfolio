@@ -11,10 +11,27 @@ const sections = document.querySelectorAll("section");
 
 let isGrabbed = false;
 
+/* =========================
+   ROBOT CONTROL
+   ========================= */
+let robotCurrentX = 0;
+let robotTargetX = 0;
+let robotManualMove = false;
+let latestScrollY = window.scrollY;
+let scrollTicking = false;
+
 /* -------- Helpers -------- */
 const clamp = (v, min, max) => Math.max(min, Math.min(v, max));
-const maxScroll = () => document.documentElement.scrollHeight - window.innerHeight;
+const maxScroll = () =>
+  document.documentElement.scrollHeight - window.innerHeight;
 
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+/* =========================
+   SLIDER → SCROLL
+   ========================= */
 function updateFromX(clientX) {
   const trackRect = sliderTrack.getBoundingClientRect();
   let x = clientX - trackRect.left;
@@ -22,197 +39,203 @@ function updateFromX(clientX) {
   x = clamp(x, 0, maxX);
 
   sliderThumb.style.left = `${x}px`;
-  const progress = x / maxX;
-  window.scrollTo(0, progress * maxScroll());
+  window.scrollTo(0, (x / maxX) * maxScroll());
 }
 
-// Robot positions for sections
+/* =========================
+   ROBOT DATA
+   ========================= */
 const robotPositions = [0, 600, 0, -600];
-const sectionTops = Array.from(sections).map(sec => sec.offsetTop);
+let sectionTops = [];
 
-// Update robot on scroll
-window.addEventListener("scroll", () => {
-  const scrollY = window.scrollY;
-  let robotX = robotPositions[0];
+function updateSectionTops() {
+  sectionTops = Array.from(sections).map(sec => sec.offsetTop);
+}
+updateSectionTops();
 
-  for (let i = 0; i < sectionTops.length - 1; i++) {
-    const start = sectionTops[i];
-    const end = sectionTops[i + 1];
-    const startX = robotPositions[i];
-    const endX = robotPositions[i + 1];
+/* =========================
+   SCROLL HANDLER (LIGHT)
+   ========================= */
+window.addEventListener(
+  "scroll",
+  () => {
+    latestScrollY = window.scrollY;
+    scrollTicking = true;
+  },
+  { passive: true }
+);
 
-    if (scrollY >= start && scrollY <= end) {
-      const t = (scrollY - start) / (end - start);
-      robotX = startX + (endX - startX) * t;
-      break;
+/* =========================
+   ROBOT ANIMATION LOOP
+   ========================= */
+function animateRobot() {
+  if (scrollTicking && !robotManualMove) {
+    scrollTicking = false;
+
+    for (let i = 0; i < sectionTops.length - 1; i++) {
+      const start = sectionTops[i];
+      const end = sectionTops[i + 1];
+
+      if (latestScrollY >= start && latestScrollY <= end) {
+        const t = (latestScrollY - start) / (end - start);
+        robotTargetX =
+          robotPositions[i] +
+          (robotPositions[i + 1] - robotPositions[i]) * t;
+        break;
+      }
     }
   }
 
-  robot.style.transform = `translateX(${robotX}px)`;
-});
+  robotCurrentX = lerp(robotCurrentX, robotTargetX, 0.12);
+  robot.style.transform = `translate3d(${robotCurrentX}px,0,0)`;
+
+  requestAnimationFrame(animateRobot);
+}
+animateRobot();
 
 /* =========================
-   GRAB — THUMB ONLY
+   SLIDER GRAB
    ========================= */
-sliderThumb.addEventListener("mousedown", (e) => {
+sliderThumb.addEventListener("mousedown", e => {
   e.preventDefault();
-  e.stopPropagation();
   isGrabbed = true;
   sliderThumb.classList.add("grabbing");
   document.body.style.userSelect = "none";
 });
 
-document.addEventListener("mousemove", (e) => {
-  if (!isGrabbed) return;
-  updateFromX(e.clientX);
+document.addEventListener("mousemove", e => {
+  if (isGrabbed) updateFromX(e.clientX);
 });
 
 document.addEventListener("mouseup", () => {
-  if (!isGrabbed) return;
   isGrabbed = false;
   sliderThumb.classList.remove("grabbing");
   document.body.style.userSelect = "";
 });
 
-sliderThumb.addEventListener("touchstart", (e) => {
-  isGrabbed = true;
-  e.stopPropagation();
-});
-
-document.addEventListener("touchmove", (e) => {
-  if (!isGrabbed) return;
-  updateFromX(e.touches[0].clientX);
-}, { passive: true });
-
-document.addEventListener("touchend", () => {
-  isGrabbed = false;
-});
+sliderThumb.addEventListener("touchstart", () => (isGrabbed = true));
+document.addEventListener(
+  "touchmove",
+  e => isGrabbed && updateFromX(e.touches[0].clientX),
+  { passive: true }
+);
+document.addEventListener("touchend", () => (isGrabbed = false));
 
 function syncThumbWithScroll() {
   if (isGrabbed) return;
   const maxX = sliderTrack.clientWidth - sliderThumb.offsetWidth;
-  const ratio = window.scrollY / maxScroll();
-  sliderThumb.style.left = `${maxX * ratio}px`;
+  sliderThumb.style.left = `${(window.scrollY / maxScroll()) * maxX}px`;
 }
 
-window.addEventListener("scroll", syncThumbWithScroll);
-window.addEventListener("resize", syncThumbWithScroll);
-syncThumbWithScroll();
-
-// Post link buttons
-btn.forEach(button => {
-  button.addEventListener("click", () => {
-    const url = button.getAttribute("data-link");
-    window.open(url, "_blank");
-  });
+addEventListener("scroll", syncThumbWithScroll);
+addEventListener("resize", () => {
+  syncThumbWithScroll();
+  updateSectionTops();
 });
 
-// Card auto scroll
+/* =========================
+   EXTERNAL LINKS
+   ========================= */
+btn.forEach(b =>
+  b.addEventListener("click", () => window.open(b.dataset.link, "_blank"))
+);
+
+/* =========================
+   CARD AUTO SCROLL
+   ========================= */
 let cards = Array.from(document.querySelectorAll(".card-items"));
 let position = 0;
 let targetPosition = 0;
 let speed = 5;
 let isPaused = false;
 
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
-
 function recycleCards() {
-  const firstCard = cards[0];
-  const firstCardWidth = firstCard.offsetWidth + 20;
-  if (-position >= firstCardWidth) {
-    position += firstCardWidth;
-    targetPosition += firstCardWidth;
-    list.appendChild(firstCard);
-    cards.push(cards.shift());
+  const w = cards[0].offsetWidth + 20;
+  if (-position >= w) {
+    position += w;
+    targetPosition += w;
+    list.appendChild(cards.shift());
+    cards.push(cards[cards.length - 1]);
   }
 }
 
-function animate() {
+function animateCards() {
   if (!isPaused) targetPosition -= speed;
   position = lerp(position, targetPosition, 0.08);
   list.style.transform = `translateX(${position}px)`;
   recycleCards();
-  requestAnimationFrame(animate);
+  requestAnimationFrame(animateCards);
 }
+animateCards();
 
-animate();
-
-cards.forEach(card => {
-  card.addEventListener("mouseenter", () => {
-    isPaused = true;
-    targetPosition = -(card.offsetLeft - wrapper.offsetWidth / 2 + card.offsetWidth / 2);
-  });
-  card.addEventListener("mouseleave", () => { isPaused = false; });
-});
-
-// Autotype
-var options = {
+/* =========================
+   AUTOTYPE
+   ========================= */
+new Typed(".Autotype", {
   strings: ["Game Developer", "Game Designer", "3D Artist", "Electronics Engineer"],
   typeSpeed: 100,
   backSpeed: 100,
   loop: true
-};
-var typed = new Typed(".Autotype", options);
-
-// ------------------------
-// NAVBAR & HIRE ME BUTTON
-// ------------------------
-
-// Set home active on load
-window.addEventListener("DOMContentLoaded", () => {
-  navLinks.forEach(link => link.classList.remove("active"));
-  const homeLink = document.querySelector('.navigation a[data-target="home"]');
-  if (homeLink) homeLink.classList.add("active");
 });
 
-// Nav link clicks
-navLinks.forEach(link => {
-  link.addEventListener("click", (e) => {
+/* =========================
+   NAV + HIRE ME
+   ========================= */
+window.addEventListener("DOMContentLoaded", () => {
+  document
+    .querySelector('.navigation a[data-target="home"]')
+    ?.classList.add("active");
+});
+
+function jumpRobotToSection(id) {
+  const index = [...sections].findIndex(s => s.id === id);
+  if (index === -1) return;
+
+  robotManualMove = true;
+  robotTargetX = robotPositions[index];
+  setTimeout(() => (robotManualMove = false), 600);
+}
+
+navLinks.forEach(link =>
+  link.addEventListener("click", e => {
     e.preventDefault();
     navLinks.forEach(l => l.classList.remove("active"));
     link.classList.add("active");
 
-    const targetId = link.dataset.target;
-    const section = document.getElementById(targetId);
-    if (section) section.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-});
-
-// Hire me button clicks
-hireButtons.forEach(btn => {
-  btn.addEventListener("click", () => {
-    const contactSection = document.getElementById("contact");
-    if (contactSection) contactSection.scrollIntoView({ behavior: "smooth", block: "start" });
-
-    // Update navbar active
-    navLinks.forEach(link => {
-      link.classList.remove("active");
-      if (link.dataset.target === "contact") link.classList.add("active");
+    jumpRobotToSection(link.dataset.target);
+    document.getElementById(link.dataset.target)?.scrollIntoView({
+      behavior: "smooth"
     });
-  });
-});
+  })
+);
+
+hireButtons.forEach(b =>
+  b.addEventListener("click", () => {
+    jumpRobotToSection("contact");
+    document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
+    navLinks.forEach(l =>
+      l.classList.toggle("active", l.dataset.target === "contact")
+    );
+  })
+);
 
 /* =========================
-   UPDATE NAV ACTIVE ON SCROLL
+   UPDATE NAV ON SCROLL
    ========================= */
 function updateNavActiveOnScroll() {
-  let currentSectionId = sections[0].id; // default
+  let current = sections[0].id;
 
   sections.forEach(sec => {
-    const rect = sec.getBoundingClientRect();
-    if (rect.top <= window.innerHeight * 0.5 && rect.bottom >= window.innerHeight * 0.5) {
-      currentSectionId = sec.id;
-    }
+    const r = sec.getBoundingClientRect();
+    if (r.top <= innerHeight * 0.5 && r.bottom >= innerHeight * 0.5)
+      current = sec.id;
   });
 
-  navLinks.forEach(link => {
-    link.classList.remove("active");
-    if (link.dataset.target === currentSectionId) link.classList.add("active");
-  });
+  navLinks.forEach(link =>
+    link.classList.toggle("active", link.dataset.target === current)
+  );
 }
 
-window.addEventListener("scroll", updateNavActiveOnScroll);
-window.addEventListener("resize", updateNavActiveOnScroll);
-window.addEventListener("load", updateNavActiveOnScroll);
+addEventListener("scroll", updateNavActiveOnScroll, { passive: true });
+addEventListener("resize", updateNavActiveOnScroll);
+addEventListener("load", updateNavActiveOnScroll);

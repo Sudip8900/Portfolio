@@ -21,6 +21,7 @@ body {
     position: fixed;
     z-index: 0;
     inset: 0;
+    will-change: transform;
 }
 
 .robot {
