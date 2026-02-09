@@ -282,10 +282,10 @@
                 <div class="contact-header"><h2>Contact me</h2></div>
                 <hr>
                 <div class="form-container">
-                    <form action="" class="contact-me">
+                    <form action="https://api.web3forms.com/submit" method="POST" class="contact-me">
+                        <input type="hidden" name="access_key" value="2fcf6229-254a-4530-a10a-814ba24bd93e">
                         <input type="text" name="name" placeholder="Your Name" class="contacts-input" required>
                         <input type="email" name="email" placeholder="Your Email" class="contacts-input" required>
-                        <input type="text" name="subject" placeholder="Subject" class="contact-input" required>
                         <textarea name="message" placeholder="Your Message" class="contact-input-message" required></textarea>
 
                         <button type="submit" class="submit">Send</button>

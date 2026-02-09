@@ -685,21 +685,6 @@ nav ul li a:active {
     color: white;
 }
 
-.contact-input {
-    width: 90%;
-    border-radius: 20px;
-    padding: 20px;
-    background-color: rgba(255, 255, 255, 0.277);
-    border: none;
-    font-family: Michroma, Comfortaa;
-    color: white;
-    height: 40px;
-}
-
-.contact-input::placeholder {
-    color: white;
-}
-
 .contact-input-message {
     width: 90%;
     border-radius: 20px;
