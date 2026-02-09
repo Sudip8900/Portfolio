@@ -108,7 +108,7 @@ nav ul li a:active {
 
 .left {
     position: absolute;
-    top: 50%;
+    top: 20%;
     left: 5%;
     transform: translateY(-50%);
     font-size: 20px;
