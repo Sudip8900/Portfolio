@@ -239,3 +239,4 @@ function updateNavActiveOnScroll() {
 addEventListener("scroll", updateNavActiveOnScroll, { passive: true });
 addEventListener("resize", updateNavActiveOnScroll);
 addEventListener("load", updateNavActiveOnScroll);
+

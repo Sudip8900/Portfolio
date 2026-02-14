@@ -1,6 +1,7 @@
 * {
     margin: 0;
     padding: 0;
+    box-sizing: border-box;
 }
 
 html,
@@ -216,7 +217,7 @@ nav ul li a:active {
     height: 600px;
     background-color: blueviolet;
     border-radius: 50%;
-    opacity: 0.5;
+    opacity:0.5;
     z-index: -1;
     -webkit-filter: blur(100px);
     filter: blur(100px);
